@@ -1,0 +1,109 @@
+# portal-coder-mid v0.1.0
+# Every model below is a Nous Portal slug. Prices change; check
+# https://portal.nousresearch.com/models before trusting any number in README.md.
+#
+# Shape: a strong main model plans, reviews and verifies; delegate_task children
+# run on a low-cost executor; every side task is pinned to a low-cost model so
+# it does not bill at the main model's rate (auxiliary "auto" = main model).
+
+model:
+  provider: nous
+  default: z-ai/glm-5.3                       # planner (text only: screenshots go through auxiliary.vision)
+
+display:
+  show_cost: true                             # $ in the status bar, so spend is visible
+
+agent:
+  # In a code workspace (CLI, TUI, Desktop, ACP): add the coding brief, collapse the
+  # toolset to the built-in "coding" set (plus your enabled MCP servers) and show
+  # non-coding skill categories as names only. Elsewhere Hermes behaves as usual.
+  coding_context: focus
+  coding_instructions: |
+    Plan before you edit. When a change spans several files or needs more than a few small edits, write the plan, then hand the implementation to delegate_task with the file paths, the exact change and how to check it is done. Review the result and run the tests yourself before you report back. Make small edits directly.
+    When testing, run the tests for the module you changed first, and the full suite once before you commit or hand back.
+
+delegation:
+  # delegate_task children run on this model. No provider key: children reuse the
+  # main model's Nous Portal sign-in. A child pinned to a model gets no fallback
+  # unless one is declared, so one is declared (another lab, so one outage does not
+  # stop both).
+  model: openai/gpt-6-luna
+  fallback_providers:
+    - provider: nous
+      model: deepseek/deepseek-v4.1-flash
+
+approvals:
+  mode: smart
+  # Appended to the smart-approval classifier's system prompt (trusted channel).
+  smart_policy: |
+    Always ESCALATE force pushes (git push --force, -f or --force-with-lease) and any rm -rf whose target is outside the current project directory. Routine development commands inside the project (tests, builds, package installs, git commit/push to feature branches, deleting build artefacts) are safe.
+
+auxiliary:
+  # Image analysis (vision_analyze, browser screenshots). An explicit vision backend
+  # also routes images through this describer when the main model has native vision.
+  # The main model here has no image input, so this pin is what lets it "see".
+  vision:
+    provider: nous
+    model: openai/gpt-6-luna
+    reasoning_effort: low
+    fallback_chain:
+      - provider: nous
+        model: anthropic/claude-haiku-5.5
+
+  # The compression summary is what a long coding session remembers of itself.
+  compression:
+    provider: nous
+    model: openai/gpt-6-luna
+    reasoning_effort: low
+    fallback_chain:
+      - provider: nous
+        model: anthropic/claude-haiku-5.5
+
+  # Dangerous-command classifier. No reasoning_effort on purpose: Hermes sends the
+  # verdict call with thinking off and a 16-token budget unless an effort is set.
+  approval:
+    provider: nous
+    model: openai/gpt-6-luna
+    fallback_chain:
+      - provider: nous
+        model: anthropic/claude-haiku-5.5
+
+  title_generation:
+    provider: nous
+    model: inclusionai/ling-3.0-flash
+    fallback_chain:
+      - provider: nous
+        model: openai/gpt-6-luna
+  skills_hub:
+    provider: nous
+    model: inclusionai/ling-3.0-flash
+    fallback_chain:
+      - provider: nous
+        model: openai/gpt-6-luna
+  mcp:
+    provider: nous
+    model: inclusionai/ling-3.0-flash
+    fallback_chain:
+      - provider: nous
+        model: openai/gpt-6-luna
+  profile_describer:
+    provider: nous
+    model: inclusionai/ling-3.0-flash
+  triage_specifier:
+    provider: nous
+    model: inclusionai/ling-3.0-flash
+  monitor:
+    provider: nous
+    model: inclusionai/ling-3.0-flash
+  tts_audio_tags:
+    provider: nous
+    model: inclusionai/ling-3.0-flash
+  memory_query_rewrite:
+    provider: nous
+    model: inclusionai/ling-3.0-flash
+
+  # Left on "auto" (= main model) on purpose:
+  #   review            - /review runs a full reviewer subagent; you call it, so it gets the planner.
+  #   background_review - writes your memory and skills; a weak writer pollutes memory.
+  #   curator           - consolidates skills; same reasoning.
+  #   kanban_decomposer, goal_judge - planning calls where quality pays for itself.

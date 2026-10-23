@@ -1,0 +1,10 @@
+name: portal-coder-mid
+version: 0.1.0
+description: "Nous Portal coding profile, mid-price tier: GLM-5.3 plans and reviews, delegated coding runs on GPT-6 Luna, and every side task is pinned to a low-cost model."
+hermes_requires: ">=0.22.4"
+author: "witcheer"
+license: "MIT"
+distribution_owned:
+  - config.yaml
+  - README.md
+  - LICENSE
